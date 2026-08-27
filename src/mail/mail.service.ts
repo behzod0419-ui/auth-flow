@@ -15,6 +15,14 @@ export class MailService {
                 pass: process.env.SMTP_PASSWORD,
             },
         });
+
+        this.transporter.verify((error, success) => {
+            if (error) {
+                console.error('❌ SMTP CONNECTION ERROR:', error);
+            } else {
+                console.log('✅ SMTP SERVER IS READY');
+            }
+        });
     }
 
     async sendVerificationEmail(
