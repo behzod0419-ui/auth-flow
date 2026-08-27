@@ -58,6 +58,31 @@ $ npm run test:cov
 ```
 
 ## Deployment
+Set these environment variables in the hosting provider. Do not commit the real values:
+
+```text
+DATABASE_URL=your-production-postgresql-url
+JWT_ACCESS_SECRET=your-access-secret
+JWT_REFRESH_SECRET=your-refresh-secret
+JWT_ACCESS_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=7d
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USER=your-email@gmail.com
+SMTP_PASSWORD=your-google-app-password
+FRONTEND_URL=https://your-frontend-domain.com
+```
+
+`SMTP_PASSWORD` must be a provider SMTP password, such as a Gmail App Password, not the normal account password. `FRONTEND_URL` must be the deployed frontend origin where `/reset-password` exists.
+
+The production start command applies pending Prisma migrations before starting the API:
+
+```bash
+npm run build
+npm run start:prod
+```
+
+After deploying, check the API logs for `SMTP SERVER IS READY`. If the reset request returns `503`, inspect the same logs for missing SMTP variables or the SMTP provider's connection error.
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
 

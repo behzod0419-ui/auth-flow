@@ -63,6 +63,19 @@ export class MailService {
         subject: string;
         html: string;
     }) {
+        const missingVariables = [
+            'SMTP_HOST',
+            'SMTP_PORT',
+            'SMTP_USER',
+            'SMTP_PASSWORD',
+        ].filter((name) => !process.env[name]);
+
+        if (missingVariables.length > 0) {
+            throw new Error(
+                `Missing SMTP configuration: ${missingVariables.join(', ')}`,
+            );
+        }
+
         return this.transporter.sendMail({
             from: `"Auth Flow" <${process.env.SMTP_USER}>`,
             to: options.to,

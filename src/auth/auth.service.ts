@@ -3,6 +3,8 @@ import {
   Injectable,
   UnauthorizedException,
   BadRequestException,
+  InternalServerErrorException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import * as crypto from 'crypto';
@@ -478,6 +480,13 @@ export class AuthService {
   }
 
   async forgotPassword(email: string) {
+    const frontendUrl = process.env.FRONTEND_URL?.replace(/\/+$/, '');
+    if (!frontendUrl) {
+      throw new InternalServerErrorException(
+        'FRONTEND_URL is not configured',
+      );
+    }
+
     console.log('1. forgotPassword started:', email);
 
     const user = await this.prisma.user.findUnique({
@@ -512,7 +521,7 @@ export class AuthService {
     console.log('5. user updated');
 
     const resetUrl =
-      `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+      `${frontendUrl}/reset-password?token=${resetToken}`;
 
     console.log('6. reset URL created');
     console.log('SMTP_HOST:', process.env.SMTP_HOST);
@@ -520,11 +529,26 @@ export class AuthService {
     console.log('SMTP_USER:', process.env.SMTP_USER);
     console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
 
-    await this.mailService.sendPasswordResetEmail(
-      user.email,
-      user.name,
-      resetUrl,
-    );
+    try {
+      await this.mailService.sendPasswordResetEmail(
+        user.email,
+        user.name,
+        resetUrl,
+      );
+    } catch (error) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          resetPasswordToken: null,
+          resetPasswordTokenExpiresAt: null,
+        },
+      });
+
+      console.error('Password reset email failed:', error);
+      throw new ServiceUnavailableException(
+        'Password reset email could not be sent',
+      );
+    }
 
     console.log('7. EMAIL SENT SUCCESSFULLY');
 
