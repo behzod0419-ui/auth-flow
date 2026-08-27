@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 @Injectable()
 export class MailService {
@@ -10,11 +11,12 @@ export class MailService {
             host: process.env.SMTP_HOST,
             port: Number(process.env.SMTP_PORT),
             secure: Number(process.env.SMTP_PORT) === 465,
+            family: 4,
             auth: {
                 user: process.env.SMTP_USER,
                 pass: process.env.SMTP_PASSWORD,
             },
-        });
+        } as SMTPTransport.Options);
 
         this.transporter.verify((error, success) => {
             if (error) {
