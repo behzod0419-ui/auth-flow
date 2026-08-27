@@ -478,9 +478,13 @@ export class AuthService {
   }
 
   async forgotPassword(email: string) {
+    console.log('1. forgotPassword started:', email);
+
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
+
+    console.log('2. user found:', !!user);
 
     if (!user) {
       return {
@@ -490,12 +494,12 @@ export class AuthService {
     }
 
     const resetToken = randomBytes(32).toString('hex');
+    console.log('3. reset token created');
 
     const hashedToken = await bcrypt.hash(resetToken, 10);
+    console.log('4. token hashed');
 
-    const expiresAt = new Date(
-      Date.now() + 15 * 60 * 1000,
-    );
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
     await this.prisma.user.update({
       where: { id: user.id },
@@ -505,14 +509,24 @@ export class AuthService {
       },
     });
 
+    console.log('5. user updated');
+
     const resetUrl =
       `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+    console.log('6. reset URL created');
+    console.log('SMTP_HOST:', process.env.SMTP_HOST);
+    console.log('SMTP_PORT:', process.env.SMTP_PORT);
+    console.log('SMTP_USER:', process.env.SMTP_USER);
+    console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
 
     await this.mailService.sendPasswordResetEmail(
       user.email,
       user.name,
       resetUrl,
     );
+
+    console.log('7. EMAIL SENT SUCCESSFULLY');
 
     return {
       success: true,
