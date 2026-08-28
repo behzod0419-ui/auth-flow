@@ -11,7 +11,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    origin: true,
+    origin: [
+    "http://localhost:5173",
+    "https://sizning-frontendingiz.netlify.app",
+  ],
     credentials: true,
   });
 
