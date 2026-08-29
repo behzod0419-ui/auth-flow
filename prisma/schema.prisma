@@ -24,10 +24,6 @@ model User {
   
   refreshTokenHash                  String?
 
-  resetPasswordToken                String?
-  resetPasswordTokenExpiresAt       DateTime?
-
-
   emailVerified                     Boolean           @default(false)
   verificationToken                 String?
   verificationTokenExpiresAt        DateTime?
