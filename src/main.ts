@@ -18,10 +18,10 @@ async function bootstrap() {
     credentials: true,
   });
 
-  app.enableCors({
-    origin: process.env.FRONTEND_URL,
-    credentials: true,
-  });
+  // app.enableCors({
+  //   origin: process.env.FRONTEND_URL,
+  //   credentials: true,
+  // });
 
   app.useGlobalPipes(
     new ValidationPipe({
