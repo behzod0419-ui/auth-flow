@@ -13,9 +13,10 @@ import { randomBytes } from 'crypto';
 
 import { MailService } from 'src/mail/mail.service';
 
-import { PrismaService } from './prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class AuthService {
@@ -409,6 +410,166 @@ export class AuthService {
     return {
       success: true,
       message: 'Email verified successfully',
+    };
+  }
+
+  async googleLogin(user: any) {
+    let existingUser = await this.prisma.user.findUnique({
+      where: {
+        email: user.email,
+      },
+    });
+
+    if (!existingUser) {
+      existingUser = await this.prisma.user.create({
+        data: {
+          email: user.email,
+          name: user.name,
+          password: '',
+          role: 'USER',
+        },
+      });
+    }
+
+    const accessToken = await this.jwtService.signAsync({
+      sub: existingUser.id,
+      email: existingUser.email,
+      role: existingUser.role,
+    });
+
+    return {
+      success: true,
+      message: 'Google login successful',
+      data: {
+        accessToken,
+        user: {
+          id: existingUser.id,
+          email: existingUser.email,
+          name: existingUser.name,
+          role: existingUser.role,
+        },
+      },
+    };
+  }
+
+  async updateProfile(
+    userId: number,
+    updateProfileDto: UpdateProfileDto,
+  ) {
+    const {
+      name,
+      email,
+      currentPassword,
+      newPassword,
+      confirmPassword,
+    } = updateProfileDto;
+
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const updateData: any = {};
+
+    // NAME
+    if (name !== undefined) {
+      updateData.name = name;
+    }
+
+    // EMAIL
+    if (email !== undefined) {
+      const existingUser = await this.prisma.user.findUnique({
+        where: {
+          email,
+        },
+      });
+
+      if (existingUser && existingUser.id !== userId) {
+        throw new ConflictException(
+          'Email already registered',
+        );
+      }
+
+      updateData.email = email;
+    }
+
+    // PASSWORD
+    if (
+      currentPassword !== undefined ||
+      newPassword !== undefined ||
+      confirmPassword !== undefined
+    ) {
+      if (!currentPassword) {
+        throw new BadRequestException(
+          'Current password is required',
+        );
+      }
+
+      if (!newPassword) {
+        throw new BadRequestException(
+          'New password is required',
+        );
+      }
+
+      if (!confirmPassword) {
+        throw new BadRequestException(
+          'Password confirmation is required',
+        );
+      }
+
+      const passwordMatch = await bcrypt.compare(
+        currentPassword,
+        user.password,
+      );
+
+      if (!passwordMatch) {
+        throw new UnauthorizedException(
+          'Current password is incorrect',
+        );
+      }
+
+      if (newPassword !== confirmPassword) {
+        throw new BadRequestException(
+          'New passwords do not match',
+        );
+      }
+
+      const hashedPassword = await bcrypt.hash(
+        newPassword,
+        12,
+      );
+
+      updateData.password = hashedPassword;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      throw new BadRequestException(
+        'No changes provided',
+      );
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: updateData,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        emailVerified: true,
+      },
+    });
+
+    return {
+      message: 'Profile updated successfully',
+      user: updatedUser,
     };
   }
 }

@@ -4,11 +4,13 @@ import type { Request } from 'express';
 import { Roles } from 'src/auth/decorators/roles.decorators';
 import { Role } from 'src/auth/enums/roles.enums';
 import { RolesGuard } from './guards/roles.guard';
+import { AuthGuard } from '@nestjs/passport';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 type AuthenticatedRequest = Request & {
   user: {
@@ -19,6 +21,18 @@ type AuthenticatedRequest = Request & {
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) { }
+
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  async googleAuth() {
+    // Passport Google'ga redirect qiladi
+  }
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleAuthRedirect(@Req() req) {
+    return this.authService.googleLogin(req.user);
+  }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
@@ -35,6 +49,18 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async profile(@Req() req: AuthenticatedRequest) {
     return this.authService.getProfile(req.user!.sub);
+  }
+
+  @Patch('profile')
+  @UseGuards(JwtAuthGuard)
+  async updateProfile(
+    @Req() req: AuthenticatedRequest,
+    @Body() updateProfileDto: UpdateProfileDto,
+  ) {
+    return this.authService.updateProfile(
+      Number(req.user.sub),
+      updateProfileDto,
+    );
   }
 
   @Get('admin')
