@@ -11,8 +11,6 @@ import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 
-import { MailService } from 'src/mail/mail.service';
-
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -23,7 +21,6 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-    private readonly mailService: MailService,
   ) { }
 
   private generateVerificationToken(): string {
@@ -69,12 +66,6 @@ export class AuthService {
         ),
       },
     });
-
-    await this.mailService.sendVerificationEmail(
-      user.email,
-      user.name,
-      verificationToken,
-    );
 
     return {
       message: 'User registered successfully',

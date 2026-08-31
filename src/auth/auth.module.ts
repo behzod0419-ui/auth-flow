@@ -6,12 +6,10 @@ import { AuthService } from './auth.service';
 import { GoogleStrategy } from './strategies/google.strategy';
 
 import { PrismaModule } from '../prisma/prisma.module';
-import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
     PrismaModule,
-    MailModule,
 
     JwtModule.register({
       secret: process.env.JWT_ACCESS_SECRET,
