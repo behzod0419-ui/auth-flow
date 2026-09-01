@@ -11,6 +11,8 @@ import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 
+import { OAuth2Client } from 'google-auth-library';
+
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -26,6 +28,10 @@ export class AuthService {
   private generateVerificationToken(): string {
     return randomBytes(32).toString('hex');
   }
+
+  private readonly googleClient = new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID,
+  );
 
   async register(registerDto: RegisterDto) {
     const { name, email, password } = registerDto;
@@ -404,43 +410,122 @@ export class AuthService {
     };
   }
 
-  async googleLogin(user: any) {
-    let existingUser = await this.prisma.user.findUnique({
-      where: {
-        email: user.email,
-      },
-    });
+  async googleLogin(credential: string) {
+    try {
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
 
-    if (!existingUser) {
-      existingUser = await this.prisma.user.create({
-        data: {
-          email: user.email,
-          name: user.name,
-          password: '',
-          role: 'USER',
+      const payload = ticket.getPayload();
+
+      if (!payload) {
+        throw new UnauthorizedException(
+          'Invalid Google credential',
+        );
+      }
+
+      const googleId = payload.sub;
+      const email = payload.email;
+      const name = payload.name;
+
+      if (!googleId || !email) {
+        throw new UnauthorizedException(
+          'Google account information is incomplete',
+        );
+      }
+
+      let existingUser = await this.prisma.user.findUnique({
+        where: {
+          email,
         },
       });
-    }
 
-    const accessToken = await this.jwtService.signAsync({
-      sub: existingUser.id,
-      email: existingUser.email,
-      role: existingUser.role,
-    });
+      if (!existingUser) {
+        const randomPassword = randomBytes(32).toString('hex');
+        const hashedPassword = await bcrypt.hash(
+          randomPassword,
+          12,
+        );
 
-    return {
-      success: true,
-      message: 'Google login successful',
-      data: {
-        accessToken,
-        user: {
-          id: existingUser.id,
+        existingUser = await this.prisma.user.create({
+          data: {
+            name: name || email.split('@')[0],
+            email,
+            password: hashedPassword,
+            role: 'USER',
+            emailVerified: true,
+            isVerified: true,
+          },
+        });
+      }
+
+      // ACCESS TOKEN
+      const accessToken = await this.jwtService.signAsync(
+        {
+          sub: existingUser.id,
           email: existingUser.email,
-          name: existingUser.name,
           role: existingUser.role,
         },
-      },
-    };
+        {
+          secret: process.env.JWT_ACCESS_SECRET,
+          expiresIn:
+            process.env.JWT_ACCESS_EXPIRES_IN as JwtSignOptions['expiresIn'],
+        },
+      );
+
+      // REFRESH TOKEN
+      const refreshToken = await this.jwtService.signAsync(
+        {
+          sub: existingUser.id,
+        },
+        {
+          secret: process.env.JWT_REFRESH_SECRET,
+          expiresIn:
+            process.env.JWT_REFRESH_EXPIRES_IN as JwtSignOptions['expiresIn'],
+        },
+      );
+
+      // REFRESH TOKEN HASH
+      const refreshTokenHash = crypto
+        .createHash('sha256')
+        .update(refreshToken)
+        .digest('hex');
+
+      await this.prisma.user.update({
+        where: {
+          id: existingUser.id,
+        },
+        data: {
+          refreshTokenHash,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Google login successful',
+        data: {
+          accessToken,
+          refreshToken,
+          user: {
+            id: existingUser.id,
+            email: existingUser.email,
+            name: existingUser.name,
+            role: existingUser.role,
+          },
+        },
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      console.error('Google login error:', error);
+
+      throw new UnauthorizedException(
+        'Invalid Google credential',
+      );
+    }
   }
 
   async updateProfile(

@@ -11,6 +11,7 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { GoogleLoginDto } from './dto/google-login.dto';
 
 type AuthenticatedRequest = Request & {
   user: {
@@ -71,6 +72,11 @@ export class AuthController {
       message: 'Welcome Admin',
       user: req.user,
     }
+  }
+
+  @Post('google')
+  async googleLogin(@Body() googleLoginDto: GoogleLoginDto) {
+    return this.authService.googleLogin(googleLoginDto.credential);
   }
 
   @Post('register')
